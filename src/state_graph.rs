@@ -1,15 +1,5 @@
-use std::collections::HashMap;
 use crate::variable_manager::{Condition, VariableManager};
-
-// TODO either move to utils or get rid of this
-macro_rules! unwrap_or_return {
-    ( $e:expr, $v:expr ) => {
-        match $e {
-            Some(x) => x,
-            None => return $v,
-        }
-    };
-}
+use std::collections::HashMap;
 
 /// A state transition that holds a target state and a vector of conditions
 /// that must be met to trigger the transition.
@@ -31,70 +21,84 @@ pub struct Node<T> {
 }
 
 /// A state graph that manages state transitions when conditions are met.
-#[derive(Default)]
 pub struct StateGraph<T> {
     variables: VariableManager,
     nodes: HashMap<String, Node<T>>,
-    pub active: Option<String>,
+    active: String,
 }
 
 impl<T> StateGraph<T> {
-    /// Adds a new node to the state graph with the given name and data.
+    /// Constructs a new `StateGraph` with the specified `default_node_name` and `nodes`.
+    ///
+    /// # Arguments
+    ///
+    /// * `default_node_name`: A `String` representing the name of the default node in the graph.
+    /// * `nodes`: A `HashMap` mapping node names to `Node<T>` instances.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `nodes` does not contain the default node specified by `default_node_name`.
+    ///
+    pub fn new(default_node_name: String, nodes: HashMap<String, Node<T>>) -> Self {
+        assert!(
+            nodes.contains_key(&default_node_name),
+            "default node not in node map"
+        );
+        StateGraph {
+            variables: VariableManager::default(),
+            nodes,
+            active: default_node_name,
+        }
+    }
+
+    /// Gets the active node's name and data.
+    ///
+    /// # Returns
+    ///
+    /// A tuple with two arguments. The first is the name of the active
+    /// node. The second is the data that is stored inside the active node.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the active node does not exist.
+    ///
+    pub fn get_active(&self) -> (&String, &T) {
+        (
+            &self.active,
+            &self
+                .nodes
+                .get(&self.active)
+                .expect("active node not found")
+                .data,
+        )
+    }
+
+    /// Sets the active node without taking into account transitions.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the node that will be set to active.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the next active node does not exist
+    ///
+    pub fn set_active(&mut self, name: String) {
+        if !self.nodes.contains_key(&name) {
+            panic!("node '{}' does not exist", name);
+        }
+        self.active = name;
+    }
+
+    /// Inserts a node to the state graph with the given name and data.
     ///
     /// # Arguments
     ///
     /// * `name` - The unique name for the new node.
     /// * `data` - The data associated with the new node.
     ///
-    /// # Panics
-    ///
-    /// This function will panic if a node with the same name already exists in the graph.
-    ///
-    pub fn create_node(&mut self, name: String, data: T) {
-        assert!(
-            self.nodes.get(&name).is_none(),
-            "node '{}' already exists",
-            &name
-        );
-        self.nodes.insert(
-            name,
-            Node {
-                data,
-                transitions: vec![],
-            },
-        );
-    }
-
-    /// Sets the transitions for an existing node with the given name.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the node to set transitions for.
-    /// * `transitions` - A vector of `Transition` structs representing the
-    /// transitions from the node.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the node with the given name does not
-    /// exist in the graph, or if any of the transition targets do not
-    /// exist in the graph.
-    ///
-    pub fn set_transitions(&mut self, name: String, transitions: Vec<Transition>) {
-        assert!(
-            self.nodes.get(&name).is_some(),
-            "node '{}' does not exist",
-            &name
-        );
-        for transition in transitions.iter() {
-            assert!(
-                self.nodes.get(&transition.target).is_some(),
-                "transition target '{}' does not exist",
-                &transition.target
-            );
-        }
-        // Node can safely be unwrapped due to assertions above.
-        let mut node = self.nodes.get_mut(&name).unwrap();
-        node.transitions = transitions;
+    pub fn set_node(&mut self, name: String, node: Node<T>) {
+        self.nodes.insert(name, node);
     }
 
     /// Sets the value of a float variable used in the state transitions.
@@ -125,12 +129,16 @@ impl<T> StateGraph<T> {
     /// If the function transitions recursively more times than the number of nodes in the graph, a panic occurs.
     ///
     pub fn transition_until_halt(&mut self) {
-        let mut transitions = 0;
-        while transitions < self.nodes.len() {
+        // Triggers are reset after first transition.
+        if !self.transition() {
+            return;
+        };
+        self.variables.reset_triggers();
+
+        for _ in 0..self.nodes.len() {
             if !self.transition() {
                 return;
-            }
-            transitions += 1;
+            };
         }
         panic!("recursive transition loop");
     }
@@ -143,12 +151,19 @@ impl<T> StateGraph<T> {
     /// A boolean indicating whether a transition was made.
     ///
     fn transition(&mut self) -> bool {
-        let active_name = unwrap_or_return!(&self.active, false);
-        let active = unwrap_or_return!(self.nodes.get(active_name), false);
+        let active = self
+            .nodes
+            .get(&self.active)
+            .unwrap_or_else(|| panic!("active node '{}' not found", &self.active));
         for transition in active.transitions.iter() {
-            let should_transition = Condition::all_true(&transition.conditions, &self.variables);
-            if should_transition {
-                self.active = Some(transition.target.clone());
+            if Condition::all_true(&transition.conditions, &self.variables) {
+                if !self.nodes.contains_key(&transition.target) {
+                    panic!(
+                        "tried to transition to non-existant target '{}'",
+                        transition.target
+                    );
+                }
+                self.active = transition.target.clone();
                 return true;
             }
         }
@@ -162,9 +177,7 @@ mod tests {
 
     #[test]
     fn test_simple_transition() {
-        let mut state_graph = StateGraph::default();
-        state_graph.set_variable("V1".to_string(), 0.0);
-        state_graph.set_variable("V2".to_string(), 1.0);
+        let mut nodes: HashMap<String, Node<String>> = HashMap::default();
         let n1 = Node {
             data: "A1".to_string(),
             transitions: vec![Transition {
@@ -172,26 +185,26 @@ mod tests {
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
         };
-        state_graph.nodes.insert("N1".to_string(), n1);
+        nodes.insert("N1".to_string(), n1);
         let n2 = Node {
             data: "A2".to_string(),
             transitions: vec![],
         };
-        state_graph.nodes.insert("N2".to_string(), n2);
+        nodes.insert("N2".to_string(), n2);
+        let mut state_graph = StateGraph::new("N1".to_string(), nodes);
+        state_graph.set_float("V1".to_string(), 0.0);
+        state_graph.set_float("V2".to_string(), 1.0);
 
-        state_graph.active = Some("N1".to_string());
         state_graph.transition_until_halt();
-        assert_eq!(state_graph.active, Some("N1".to_string()));
-        state_graph.set_variable("V2".to_string(), 0.0);
+        assert_eq!(state_graph.get_active().0.clone(), "N1".to_string());
+        state_graph.set_float("V2".to_string(), 0.0);
         state_graph.transition_until_halt();
-        assert_eq!(state_graph.active, Some("N2".to_string()));
+        assert_eq!(state_graph.get_active().0.clone(), "N2".to_string());
     }
 
     #[test]
-    fn test_complicated_transitions() {
-        let mut state_graph = StateGraph::default();
-        state_graph.set_variable("V1".to_string(), 0.0);
-        state_graph.set_variable("V2".to_string(), 0.0);
+    fn test_chained_transition() {
+        let mut nodes: HashMap<String, Node<String>> = HashMap::default();
         let n1 = Node {
             data: "A1".to_string(),
             transitions: vec![Transition {
@@ -199,7 +212,7 @@ mod tests {
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
         };
-        state_graph.nodes.insert("N1".to_string(), n1);
+        nodes.insert("N1".to_string(), n1);
         let n2 = Node {
             data: "A2".to_string(),
             transitions: vec![Transition {
@@ -207,14 +220,42 @@ mod tests {
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
         };
-        state_graph.nodes.insert("N2".to_string(), n2);
+        nodes.insert("N2".to_string(), n2);
         let n3 = Node {
+            data: "A3".to_string(),
+            transitions: vec![],
+        };
+        nodes.insert("N3".to_string(), n3);
+        let mut state_graph = StateGraph::new("N1".to_string(), nodes);
+        state_graph.set_float("V1".to_string(), 0.0);
+        state_graph.set_float("V2".to_string(), 0.0);
+
+        state_graph.transition_until_halt();
+        assert_eq!(state_graph.get_active().0.clone(), "N3".to_string());
+    }
+
+    #[test]
+    fn test_trigger_transitions() {
+        let mut nodes: HashMap<String, Node<String>> = HashMap::default();
+        let n1 = Node {
+            data: "A1".to_string(),
+            transitions: vec![Transition {
+                target: "N2".to_string(),
+                conditions: vec![Condition::Trigger("T1".to_string())],
+            }],
+        };
+        let n2 = Node {
             data: "A2".to_string(),
             transitions: vec![],
         };
-        state_graph.nodes.insert("N3".to_string(), n3);
-        state_graph.active = Some("N1".to_string());
+        nodes.insert("N1".to_string(), n1);
+        nodes.insert("N2".to_string(), n2);
+        let mut state_graph = StateGraph::new("N1".to_string(), nodes);
+
         state_graph.transition_until_halt();
-        assert_eq!(state_graph.active, Some("N3".to_string()));
+        assert_eq!(state_graph.get_active().0.clone(), "N1".to_string());
+        state_graph.set_trigger("T1".to_string());
+        state_graph.transition_until_halt();
+        assert_eq!(state_graph.get_active().0.clone(), "N2".to_string());
     }
 }

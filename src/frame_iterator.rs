@@ -1,13 +1,13 @@
-pub struct TextureIterator {
+pub struct FrameIterator {
     offset: usize,
     length: usize,
     current: usize,
 }
 
-impl TextureIterator {
+impl FrameIterator {
     pub fn new(first: usize, last: usize) -> Self {
         assert!(first <= last, "last frame cannot be before first");
-        TextureIterator {
+        FrameIterator {
             offset: first,
             length: 1 + last - first,
             current: 0,
@@ -40,7 +40,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_iteration() {
-        let mut ti = TextureIterator::new(0, 3);
+        let mut ti = FrameIterator::new(0, 3);
         assert_eq!(ti.current(), 0);
         assert_eq!(ti.length(), 4);
         assert_eq!(ti.next(), 1);
@@ -54,11 +54,11 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_invalid_creation() {
-        TextureIterator::new(1, 0);
+        FrameIterator::new(1, 0);
     }
 
     #[test]
     fn test_no_panic_one_frame() {
-        TextureIterator::new(0, 0);
+        FrameIterator::new(0, 0);
     }
 }

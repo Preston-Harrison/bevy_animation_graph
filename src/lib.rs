@@ -1,5 +1,4 @@
-mod animation;
 mod animator;
+mod frame_iterator;
 mod state_graph;
-mod texture_iterator;
 mod variable_manager;

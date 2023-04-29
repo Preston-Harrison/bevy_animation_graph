@@ -1,4 +1,3 @@
-use crate::animation::Animation;
 use std::collections::HashMap;
 
 macro_rules! unwrap_or_return {
@@ -52,20 +51,24 @@ pub struct Transition {
 }
 
 #[derive(Clone)]
-pub struct Node {
-    animation: String,
+pub struct Node<T> {
+    state: T,
     transitions: Vec<Transition>,
     has_exit_time: bool,
 }
 
 #[derive(Default)]
-pub struct NodeTree {
-    pub variables: HashMap<String, f32>,
-    pub nodes: HashMap<String, Node>,
+pub struct StateGraph<T> {
+    variables: HashMap<String, f32>,
+    pub nodes: HashMap<String, Node<T>>,
     pub active: Option<String>,
 }
 
-impl NodeTree {
+impl<T> StateGraph<T> {
+    pub fn set_variable(&mut self, name: String, value: f32) {
+        self.variables.insert(name, value);
+    }
+
     fn recurse_transition(&mut self, is_last_frame: bool) {
         if !self.transition(is_last_frame) {
             return;
@@ -103,33 +106,64 @@ mod tests {
 
     #[test]
     fn test_simple_transition() {
-        let mut node_tree = NodeTree::default();
-        node_tree.variables.insert("V1".to_string(), 0.0);
-        node_tree.variables.insert("V2".to_string(), 1.0);
+        let mut state_graph = StateGraph::default();
+        state_graph.set_variable("V1".to_string(), 0.0);
+        state_graph.set_variable("V2".to_string(), 1.0);
         let n1 = Node {
-            animation: "A1".to_string(),
+            state: "A1".to_string(),
             transitions: vec![Transition {
                 to: "N2".to_string(),
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
             has_exit_time: false,
         };
-        node_tree.nodes.insert("N1".to_string(), n1);
+        state_graph.nodes.insert("N1".to_string(), n1);
         let n2 = Node {
-            animation: "A2".to_string(),
+            state: "A2".to_string(),
             transitions: vec![],
             has_exit_time: false,
         };
-        node_tree.nodes.insert("N2".to_string(), n2);
+        state_graph.nodes.insert("N2".to_string(), n2);
 
-        node_tree.active = Some("N1".to_string());
-        node_tree.recurse_transition(false);
-        assert_eq!(node_tree.active, Some("N1".to_string()));
-        node_tree.variables.insert("V2".to_string(), 0.0);
-        node_tree.recurse_transition(false);
-        assert_eq!(node_tree.active, Some("N2".to_string()));
+        state_graph.active = Some("N1".to_string());
+        state_graph.recurse_transition(false);
+        assert_eq!(state_graph.active, Some("N1".to_string()));
+        state_graph.set_variable("V2".to_string(), 0.0);
+        state_graph.recurse_transition(false);
+        assert_eq!(state_graph.active, Some("N2".to_string()));
     }
 
     #[test]
-    fn test_complicated_transitions() {}
+    fn test_complicated_transitions() {
+        let mut state_graph = StateGraph::default();
+        state_graph.set_variable("V1".to_string(), 0.0);
+        state_graph.set_variable("V2".to_string(), 0.0);
+        let n1 = Node {
+            state: "A1".to_string(),
+            transitions: vec![Transition {
+                to: "N2".to_string(),
+                conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
+            }],
+            has_exit_time: false,
+        };
+        state_graph.nodes.insert("N1".to_string(), n1);
+        let n2 = Node {
+            state: "A2".to_string(),
+            transitions: vec![Transition {
+                to: "N3".to_string(),
+                conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
+            }],
+            has_exit_time: false,
+        };
+        state_graph.nodes.insert("N2".to_string(), n2);
+        let n3 = Node {
+            state: "A2".to_string(),
+            transitions: vec![],
+            has_exit_time: false,
+        };
+        state_graph.nodes.insert("N3".to_string(), n3);
+        state_graph.active = Some("N1".to_string());
+        state_graph.recurse_transition(false);
+        assert_eq!(state_graph.active, Some("N3".to_string()));
+    }
 }

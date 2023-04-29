@@ -1,4 +1,4 @@
 mod animation;
 mod animator;
-mod node_tree;
+mod state_graph;
 mod texture_iterator;

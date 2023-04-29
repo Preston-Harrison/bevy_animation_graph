@@ -1,7 +1,6 @@
-use std::time::Duration;
-
-use crate::{state_graph::StateGraph, animation::Animation, texture_iterator::TextureIterator};
+use crate::{animation::Animation, state_graph::StateGraph, texture_iterator::TextureIterator};
 use bevy::prelude::*;
+use std::time::Duration;
 
 #[derive(Component)]
 pub struct Animator {

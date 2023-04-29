@@ -45,34 +45,88 @@ impl Condition {
     }
 }
 
-/// A state transition that holds a target state and a vector of conditions 
+/// A state transition that holds a target state and a vector of conditions
 /// that must be met to trigger the transition.
 #[derive(Clone)]
 pub struct Transition {
     /// The target state that the transition leads to.
-    target: String,
+    pub target: String,
     /// A vector of conditions that must be met for the transition to occur.
-    conditions: Vec<Condition>,
+    pub conditions: Vec<Condition>,
 }
 
 /// Represents a node in a StateGraph.  
 #[derive(Clone)]
 pub struct Node<T> {
     /// The data that the node holds.
-    data: T,
+    pub data: T,
     /// A list of transitions that will be executed in priority of low to high.
-    transitions: Vec<Transition>,
+    pub transitions: Vec<Transition>,
 }
 
 /// A state graph that manages state transitions when conditions are met.
 #[derive(Default)]
 pub struct StateGraph<T> {
     variables: HashMap<String, f32>,
-    pub nodes: HashMap<String, Node<T>>,
+    nodes: HashMap<String, Node<T>>,
     pub active: Option<String>,
 }
 
 impl<T> StateGraph<T> {
+    /// Adds a new node to the state graph with the given name and data.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The unique name for the new node.
+    /// * `data` - The data associated with the new node.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if a node with the same name already exists in the graph.
+    ///
+    pub fn create_node(&mut self, name: String, data: T) {
+        assert!(
+            self.nodes.get(&name).is_none(),
+            "node '{}' already exists",
+            &name
+        );
+        self.nodes.insert(
+            name,
+            Node {
+                data,
+                transitions: vec![],
+            },
+        );
+    }
+
+    /// Sets the transitions for an existing node with the given name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the node to set transitions for.
+    /// * `transitions` - A vector of `Transition` structs representing the
+    /// transitions from the node.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the node with the given name does not
+    /// exist in the graph, or if any of the transition targets do not 
+    /// exist in the graph.
+    ///
+    pub fn set_transitions(&mut self, name: String, transitions: Vec<Transition>) {
+        assert!(self.nodes.get(&name).is_some(), "node '{}' does not exist", &name);
+        for transition in transitions.iter() {
+            assert!(
+                self.nodes.get(&transition.target).is_some(),
+                "transition target '{}' does not exist",
+                &transition.target
+            );
+        }
+        // Node can safely be unwrapped due to assertions above.
+        let mut node = self.nodes.get_mut(&name).unwrap();
+        node.transitions = transitions;
+    }
+
     /// Sets the value of a variable used in the state transitions.
     ///
     /// # Arguments

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use crate::variable_manager::{Condition, VariableManager};
 
 // TODO either move to utils or get rid of this
 macro_rules! unwrap_or_return {
@@ -8,41 +9,6 @@ macro_rules! unwrap_or_return {
             None => return $v,
         }
     };
-}
-
-#[derive(Clone)]
-pub enum Condition {
-    Gt(String, String),
-    Lt(String, String),
-    Eq(String, String),
-}
-
-impl Condition {
-    fn eval(&self, variables: &HashMap<String, f32>) -> bool {
-        match self {
-            Condition::Gt(a, b) => match (variables.get(a), variables.get(b)) {
-                (Some(v1), Some(v2)) => v1 > v2,
-                _ => false,
-            },
-            Condition::Lt(a, b) => match (variables.get(a), variables.get(b)) {
-                (Some(v1), Some(v2)) => v1 < v2,
-                _ => false,
-            },
-            Condition::Eq(a, b) => match (variables.get(a), variables.get(b)) {
-                (Some(v1), Some(v2)) => v1 == v2,
-                _ => false,
-            },
-        }
-    }
-
-    fn all_true(conditions: &[Condition], variables: &HashMap<String, f32>) -> bool {
-        for condition in conditions {
-            if !condition.eval(variables) {
-                return false;
-            }
-        }
-        true
-    }
 }
 
 /// A state transition that holds a target state and a vector of conditions
@@ -67,7 +33,7 @@ pub struct Node<T> {
 /// A state graph that manages state transitions when conditions are met.
 #[derive(Default)]
 pub struct StateGraph<T> {
-    variables: HashMap<String, f32>,
+    variables: VariableManager,
     nodes: HashMap<String, Node<T>>,
     pub active: Option<String>,
 }
@@ -110,11 +76,15 @@ impl<T> StateGraph<T> {
     /// # Panics
     ///
     /// This function will panic if the node with the given name does not
-    /// exist in the graph, or if any of the transition targets do not 
+    /// exist in the graph, or if any of the transition targets do not
     /// exist in the graph.
     ///
     pub fn set_transitions(&mut self, name: String, transitions: Vec<Transition>) {
-        assert!(self.nodes.get(&name).is_some(), "node '{}' does not exist", &name);
+        assert!(
+            self.nodes.get(&name).is_some(),
+            "node '{}' does not exist",
+            &name
+        );
         for transition in transitions.iter() {
             assert!(
                 self.nodes.get(&transition.target).is_some(),
@@ -127,15 +97,25 @@ impl<T> StateGraph<T> {
         node.transitions = transitions;
     }
 
-    /// Sets the value of a variable used in the state transitions.
+    /// Sets the value of a float variable used in the state transitions.
     ///
     /// # Arguments
     ///
     /// * `name` - The name of the variable to set.
     /// * `value` - The value to set the variable to.
     ///
-    pub fn set_variable(&mut self, name: String, value: f32) {
-        self.variables.insert(name, value);
+    pub fn set_float(&mut self, name: String, value: f32) {
+        self.variables.set_float(name, value);
+    }
+
+    /// Sets a trigger value to true.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the variable to set.
+    ///
+    pub fn set_trigger(&mut self, name: String) {
+        self.variables.set_trigger(name);
     }
 
     /// Transitions through the states of the state graph until a halting state is reached.

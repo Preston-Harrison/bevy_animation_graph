@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+// TODO either move to utils or get rid of this
 macro_rules! unwrap_or_return {
     ( $e:expr, $v:expr ) => {
         match $e {
@@ -33,26 +34,33 @@ impl Condition {
             },
         }
     }
-}
 
-fn and_conditions(conditions: &[Condition], variables: &HashMap<String, f32>) -> bool {
-    for condition in conditions {
-        if !condition.eval(variables) {
-            return false;
+    fn all_true(conditions: &[Condition], variables: &HashMap<String, f32>) -> bool {
+        for condition in conditions {
+            if !condition.eval(variables) {
+                return false;
+            }
         }
+        true
     }
-    true
 }
 
+/// A state transition that holds a target state and a vector of conditions 
+/// that must be met to trigger the transition.
 #[derive(Clone)]
 pub struct Transition {
-    to: String,
+    /// The target state that the transition leads to.
+    target: String,
+    /// A vector of conditions that must be met for the transition to occur.
     conditions: Vec<Condition>,
 }
 
+/// Represents a node in a StateGraph.  
 #[derive(Clone)]
 pub struct Node<T> {
-    state: T,
+    /// The data that the node holds.
+    data: T,
+    /// A list of transitions that will be executed in priority of low to high.
     transitions: Vec<Transition>,
 }
 
@@ -104,9 +112,9 @@ impl<T> StateGraph<T> {
         let active_name = unwrap_or_return!(&self.active, false);
         let active = unwrap_or_return!(self.nodes.get(active_name), false);
         for transition in active.transitions.iter() {
-            let should_transition = and_conditions(&transition.conditions, &self.variables);
+            let should_transition = Condition::all_true(&transition.conditions, &self.variables);
             if should_transition {
-                self.active = Some(transition.to.clone());
+                self.active = Some(transition.target.clone());
                 return true;
             }
         }
@@ -124,15 +132,15 @@ mod tests {
         state_graph.set_variable("V1".to_string(), 0.0);
         state_graph.set_variable("V2".to_string(), 1.0);
         let n1 = Node {
-            state: "A1".to_string(),
+            data: "A1".to_string(),
             transitions: vec![Transition {
-                to: "N2".to_string(),
+                target: "N2".to_string(),
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
         };
         state_graph.nodes.insert("N1".to_string(), n1);
         let n2 = Node {
-            state: "A2".to_string(),
+            data: "A2".to_string(),
             transitions: vec![],
         };
         state_graph.nodes.insert("N2".to_string(), n2);
@@ -151,23 +159,23 @@ mod tests {
         state_graph.set_variable("V1".to_string(), 0.0);
         state_graph.set_variable("V2".to_string(), 0.0);
         let n1 = Node {
-            state: "A1".to_string(),
+            data: "A1".to_string(),
             transitions: vec![Transition {
-                to: "N2".to_string(),
+                target: "N2".to_string(),
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
         };
         state_graph.nodes.insert("N1".to_string(), n1);
         let n2 = Node {
-            state: "A2".to_string(),
+            data: "A2".to_string(),
             transitions: vec![Transition {
-                to: "N3".to_string(),
+                target: "N3".to_string(),
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
         };
         state_graph.nodes.insert("N2".to_string(), n2);
         let n3 = Node {
-            state: "A2".to_string(),
+            data: "A2".to_string(),
             transitions: vec![],
         };
         state_graph.nodes.insert("N3".to_string(), n3);

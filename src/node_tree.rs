@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::animation::Animation;
+use std::collections::HashMap;
 
 macro_rules! unwrap_or_return {
     ( $e:expr, $v:expr ) => {
@@ -7,9 +7,10 @@ macro_rules! unwrap_or_return {
             Some(x) => x,
             None => return $v,
         }
-    }
+    };
 }
 
+#[derive(Clone)]
 pub enum Condition {
     Gt(String, String),
     Lt(String, String),
@@ -19,23 +20,17 @@ pub enum Condition {
 impl Condition {
     fn eval(&self, variables: &HashMap<String, f32>) -> bool {
         match self {
-            Condition::Gt(a, b) => {
-                match (variables.get(a), variables.get(b)) {
-                    (Some(v1), Some(v2)) => v1 > v2,
-                    _ => false
-                }
+            Condition::Gt(a, b) => match (variables.get(a), variables.get(b)) {
+                (Some(v1), Some(v2)) => v1 > v2,
+                _ => false,
             },
-            Condition::Lt(a, b) => {
-                match (variables.get(a), variables.get(b)) {
-                    (Some(v1), Some(v2)) => v1 < v2,
-                    _ => false
-                }
+            Condition::Lt(a, b) => match (variables.get(a), variables.get(b)) {
+                (Some(v1), Some(v2)) => v1 < v2,
+                _ => false,
             },
-            Condition::Eq(a, b) => {
-                match (variables.get(a), variables.get(b)) {
-                    (Some(v1), Some(v2)) => v1 == v2,
-                    _ => false
-                }
+            Condition::Eq(a, b) => match (variables.get(a), variables.get(b)) {
+                (Some(v1), Some(v2)) => v1 == v2,
+                _ => false,
             },
         }
     }
@@ -47,17 +42,19 @@ fn and_conditions(conditions: &[Condition], variables: &HashMap<String, f32>) ->
             return false;
         }
     }
-    return true;
+    true
 }
 
+#[derive(Clone)]
 pub struct Transition {
     to: String,
-    conditions: Vec<Condition>
+    conditions: Vec<Condition>,
 }
 
+#[derive(Clone)]
 pub struct Node {
-    animation: Animation,
-    transitions: Vec<Transition>, 
+    animation: String,
+    transitions: Vec<Transition>,
     has_exit_time: bool,
 }
 
@@ -65,7 +62,7 @@ pub struct Node {
 pub struct NodeTree {
     pub variables: HashMap<String, f32>,
     pub nodes: HashMap<String, Node>,
-    active: Option<String>,
+    pub active: Option<String>,
 }
 
 impl NodeTree {
@@ -84,7 +81,7 @@ impl NodeTree {
     }
 
     fn transition(&mut self, is_last_frame: bool) -> bool {
-        let active_name = unwrap_or_return!(&self.active, false); 
+        let active_name = unwrap_or_return!(&self.active, false);
         let active = unwrap_or_return!(self.nodes.get(active_name), false);
         if !is_last_frame && active.has_exit_time {
             return false;
@@ -96,6 +93,43 @@ impl NodeTree {
                 return true;
             }
         }
-        return false;
+        false
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_simple_transition() {
+        let mut node_tree = NodeTree::default();
+        node_tree.variables.insert("V1".to_string(), 0.0);
+        node_tree.variables.insert("V2".to_string(), 1.0);
+        let n1 = Node {
+            animation: "A1".to_string(),
+            transitions: vec![Transition {
+                to: "N2".to_string(),
+                conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
+            }],
+            has_exit_time: false,
+        };
+        node_tree.nodes.insert("N1".to_string(), n1);
+        let n2 = Node {
+            animation: "A2".to_string(),
+            transitions: vec![],
+            has_exit_time: false,
+        };
+        node_tree.nodes.insert("N2".to_string(), n2);
+
+        node_tree.active = Some("N1".to_string());
+        node_tree.recurse_transition(false);
+        assert_eq!(node_tree.active, Some("N1".to_string()));
+        node_tree.variables.insert("V2".to_string(), 0.0);
+        node_tree.recurse_transition(false);
+        assert_eq!(node_tree.active, Some("N2".to_string()));
+    }
+
+    #[test]
+    fn test_complicated_transitions() {}
 }

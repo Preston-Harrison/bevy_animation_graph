@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 pub struct Animation {
     first: usize,
-	last: usize,
+    last: usize,
     texture: Handle<TextureAtlas>,
     frame_rate: Duration,
 }
@@ -18,17 +18,17 @@ impl Animation {
     ) -> Self {
         Animation {
             first,
-			last,
+            last,
             texture,
             frame_rate,
         }
     }
 
-	pub fn first(&self) -> usize {
-		self.first
-	}
+    pub fn first(&self) -> usize {
+        self.first
+    }
 
-	pub fn last(&self) -> usize {
-		self.last
-	}
+    pub fn last(&self) -> usize {
+        self.last
+    }
 }

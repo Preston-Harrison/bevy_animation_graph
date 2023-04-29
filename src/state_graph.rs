@@ -54,9 +54,9 @@ pub struct Transition {
 pub struct Node<T> {
     state: T,
     transitions: Vec<Transition>,
-    has_exit_time: bool,
 }
 
+/// A state graph that manages state transitions when conditions are met.
 #[derive(Default)]
 pub struct StateGraph<T> {
     variables: HashMap<String, f32>,
@@ -65,17 +65,27 @@ pub struct StateGraph<T> {
 }
 
 impl<T> StateGraph<T> {
+    /// Sets the value of a variable used in the state transitions.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the variable to set.
+    /// * `value` - The value to set the variable to.
+    ///
     pub fn set_variable(&mut self, name: String, value: f32) {
         self.variables.insert(name, value);
     }
 
-    fn recurse_transition(&mut self, is_last_frame: bool) {
-        if !self.transition(is_last_frame) {
-            return;
-        }
-        let mut transitions = 1;
+    /// Transitions through the states of the state graph until a halting state is reached.
+    ///
+    /// # Panics
+    ///
+    /// If the function transitions recursively more times than the number of nodes in the graph, a panic occurs.
+    ///
+    pub fn transition_until_halt(&mut self) {
+        let mut transitions = 0;
         while transitions < self.nodes.len() {
-            if !self.transition(is_last_frame) {
+            if !self.transition() {
                 return;
             }
             transitions += 1;
@@ -83,12 +93,16 @@ impl<T> StateGraph<T> {
         panic!("recursive transition loop");
     }
 
-    fn transition(&mut self, is_last_frame: bool) -> bool {
+    /// Checks all the conditions in the active state and transitions once if any of the
+    /// transitions has all of it's conditions met.
+    ///
+    /// # Returns
+    ///
+    /// A boolean indicating whether a transition was made.
+    ///
+    fn transition(&mut self) -> bool {
         let active_name = unwrap_or_return!(&self.active, false);
         let active = unwrap_or_return!(self.nodes.get(active_name), false);
-        if !is_last_frame && active.has_exit_time {
-            return false;
-        }
         for transition in active.transitions.iter() {
             let should_transition = and_conditions(&transition.conditions, &self.variables);
             if should_transition {
@@ -115,21 +129,19 @@ mod tests {
                 to: "N2".to_string(),
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
-            has_exit_time: false,
         };
         state_graph.nodes.insert("N1".to_string(), n1);
         let n2 = Node {
             state: "A2".to_string(),
             transitions: vec![],
-            has_exit_time: false,
         };
         state_graph.nodes.insert("N2".to_string(), n2);
 
         state_graph.active = Some("N1".to_string());
-        state_graph.recurse_transition(false);
+        state_graph.transition_until_halt();
         assert_eq!(state_graph.active, Some("N1".to_string()));
         state_graph.set_variable("V2".to_string(), 0.0);
-        state_graph.recurse_transition(false);
+        state_graph.transition_until_halt();
         assert_eq!(state_graph.active, Some("N2".to_string()));
     }
 
@@ -144,7 +156,6 @@ mod tests {
                 to: "N2".to_string(),
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
-            has_exit_time: false,
         };
         state_graph.nodes.insert("N1".to_string(), n1);
         let n2 = Node {
@@ -153,17 +164,15 @@ mod tests {
                 to: "N3".to_string(),
                 conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
             }],
-            has_exit_time: false,
         };
         state_graph.nodes.insert("N2".to_string(), n2);
         let n3 = Node {
             state: "A2".to_string(),
             transitions: vec![],
-            has_exit_time: false,
         };
         state_graph.nodes.insert("N3".to_string(), n3);
         state_graph.active = Some("N1".to_string());
-        state_graph.recurse_transition(false);
+        state_graph.transition_until_halt();
         assert_eq!(state_graph.active, Some("N3".to_string()));
     }
 }

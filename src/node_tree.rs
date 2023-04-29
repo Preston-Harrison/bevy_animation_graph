@@ -10,7 +10,7 @@ macro_rules! unwrap_or_return {
     }
 }
 
-enum Condition {
+pub enum Condition {
     Gt(String, String),
     Lt(String, String),
     Eq(String, String),
@@ -50,12 +50,12 @@ fn and_conditions(conditions: &[Condition], variables: &HashMap<String, f32>) ->
     return true;
 }
 
-struct Transition {
+pub struct Transition {
     to: String,
     conditions: Vec<Condition>
 }
 
-struct Node {
+pub struct Node {
     animation: Animation,
     transitions: Vec<Transition>, 
     has_exit_time: bool,
@@ -84,15 +84,15 @@ impl NodeTree {
     }
 
     fn transition(&mut self, is_last_frame: bool) -> bool {
-        let active_name = unwrap_or_return!(self.active, false); 
-        let active = unwrap_or_return!(self.nodes.get(&active_name), false);
+        let active_name = unwrap_or_return!(&self.active, false); 
+        let active = unwrap_or_return!(self.nodes.get(active_name), false);
         if !is_last_frame && active.has_exit_time {
             return false;
         }
-        for transition in active.transitions {
+        for transition in active.transitions.iter() {
             let should_transition = and_conditions(&transition.conditions, &self.variables);
             if should_transition {
-                self.active = Some(transition.to);
+                self.active = Some(transition.to.clone());
                 return true;
             }
         }

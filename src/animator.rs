@@ -1,9 +1,6 @@
-use crate::{
-    frame_iterator::{self, FrameIterator},
-    state_graph::StateGraph,
-};
-use bevy::{prelude::*, utils::tracing::Instrument};
-use std::{time::Duration, f32::NEG_INFINITY};
+use crate::{frame_iterator::FrameIterator, state_graph::StateGraph};
+use bevy::prelude::*;
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct Animation {
@@ -47,7 +44,7 @@ impl Animator {
     }
 
     pub fn transition_to(&mut self, name: String) {
-        let (active_name, data) = self.state_graph.get_active();
+        let (active_name, _) = self.state_graph.get_active();
         if *active_name == name {
             return;
         }
@@ -64,7 +61,15 @@ impl Animator {
     }
 }
 
-pub fn animate(
+pub struct AnimationPlugin;
+
+impl Plugin for AnimationPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_system(animate);
+    }
+}
+
+fn animate(
     mut query: Query<
         (
             &mut Handle<TextureAtlas>,
@@ -77,12 +82,12 @@ pub fn animate(
 ) {
     for (mut texture_atlas, mut sprite, mut animator) in query.iter_mut() {
         // Initialize frame iterator and last frame time if they are None.
-        
+
         // If no frame exit time.
         //      Play next if exists.
         //      Transition, if successful reset iterator
         //      update texture, and sprite
-        
+
         // If frame exit time
         //      If no next, transition
         //      If last frame and play next, play next, reset iterator, update texture and sprite
@@ -90,10 +95,10 @@ pub fn animate(
         //      Else only update sprite
 
         // Go to next frame
-        // Continue 
+        // Continue
 
         if animator.frame_iterator.is_none() {
-            animator.sync_frame_iterator();         
+            animator.sync_frame_iterator();
         }
         if animator.last_frame_time.is_none() {
             animator.last_frame_time = Some(time.elapsed());

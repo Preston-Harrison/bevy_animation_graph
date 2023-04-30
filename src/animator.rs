@@ -1,6 +1,9 @@
-use crate::{frame_iterator::FrameIterator, state_graph::StateGraph};
-use bevy::prelude::*;
-use std::time::Duration;
+use crate::{
+    frame_iterator::{self, FrameIterator},
+    state_graph::StateGraph,
+};
+use bevy::{prelude::*, utils::tracing::Instrument};
+use std::{time::Duration, f32::NEG_INFINITY};
 
 #[derive(Clone)]
 pub struct Animation {
@@ -30,7 +33,7 @@ pub struct Animator {
     pub state_graph: StateGraph<AnimationData>,
     pub frame_iterator: Option<FrameIterator>,
     pub last_frame_time: Option<Duration>,
-    pub play_after_exit: Option<String>,
+    pub play_next: Option<String>,
 }
 
 impl Animator {
@@ -39,13 +42,107 @@ impl Animator {
             state_graph,
             frame_iterator: None,
             last_frame_time: None,
-            play_after_exit: None,
+            play_next: None,
         }
     }
 
-    pub fn play(&mut self, name: String) {
-        if *self.state_graph.get_active().0 == name {
+    pub fn play_next(&mut self, name: String) {
+        let (active_name, data) = self.state_graph.get_active();
+        if *active_name == name {
             return;
         }
+        self.play_next = Some(name);
+    }
+
+    fn play_new(&mut self, name: String, time: &Res<Time>) {
+        self.state_graph.set_active(name);
+        let (_, active_animation) = self.state_graph.get_active();
+        let (first_frame, last_frame) = (
+            active_animation.animation.first_frame,
+            active_animation.animation.last_frame,
+        );
+        self.frame_iterator = Some(FrameIterator::new(first_frame, last_frame));
+        self.last_frame_time = Some(time.elapsed());
+    }
+
+    fn sync_frame_iterator(&mut self) {
+        let (_, active_animation) = self.state_graph.get_active();
+        let (first_frame, last_frame) = (
+            active_animation.animation.first_frame,
+            active_animation.animation.last_frame,
+        );
+        self.frame_iterator = Some(FrameIterator::new(first_frame, last_frame));
+    }
+}
+
+fn animate(
+    mut query: Query<
+        (
+            &mut Handle<TextureAtlas>,
+            &mut TextureAtlasSprite,
+            &mut Animator,
+        ),
+        With<Animator>,
+    >,
+    time: Res<Time>,
+) {
+    for (mut texture_atlas, mut sprite, mut animator) in query.iter_mut() {
+        // Initialize frame iterator and last frame time if they are None.
+        
+        // If no frame exit time.
+        //      Play next if exists.
+        //      Transition, if successful reset iterator
+        //      update texture, and sprite
+        
+        // If frame exit time
+        //      If no next, transition
+        //      If last frame and play next, play next, reset iterator, update texture and sprite
+        //      If last frame, sync iterator, texture, and sprite with current transition
+        //      Else only update sprite
+
+        // Go to next frame
+        // Continue 
+
+        if animator.frame_iterator.is_none() {
+            animator.sync_frame_iterator();         
+        }
+        if animator.last_frame_time.is_none() {
+            animator.last_frame_time = Some(time.elapsed());
+        }
+
+        let animation_data = animator.state_graph.get_active().1;
+        if !animation_data.has_exit_time {
+            if let Some(next) = animator.play_next.take() {
+                animator.state_graph.set_active(next);
+            }
+            if animator.state_graph.transition_until_halt() {
+                animator.sync_frame_iterator();
+            }
+            let animation_data = animator.state_graph.get_active().1;
+            let frame_iterator = animator.frame_iterator.as_ref().unwrap();
+            *texture_atlas = animation_data.animation.texture.clone();
+            *sprite = TextureAtlasSprite::new(frame_iterator.current());
+        } else {
+            if animator.play_next.is_none() {
+                animator.state_graph.transition_until_halt();
+            }
+            let frame_iterator = animator.frame_iterator.as_ref().unwrap();
+            if frame_iterator.is_last_frame() {
+                if let Some(next) = animator.play_next.take() {
+                    animator.state_graph.set_active(next);
+                }
+                animator.sync_frame_iterator();
+                let animation_data = animator.state_graph.get_active().1;
+                let frame_iterator = animator.frame_iterator.as_ref().unwrap();
+                *texture_atlas = animation_data.animation.texture.clone();
+                *sprite = TextureAtlasSprite::new(frame_iterator.current());
+            } else {
+                let frame_iterator = animator.frame_iterator.as_ref().unwrap();
+                *sprite = TextureAtlasSprite::new(frame_iterator.current());
+            }
+        }
+
+        let frame_iterator = animator.frame_iterator.as_mut().unwrap();
+        frame_iterator.next();
     }
 }

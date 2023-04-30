@@ -128,16 +128,16 @@ impl<T> StateGraph<T> {
     ///
     /// If the function transitions recursively more times than the number of nodes in the graph, a panic occurs.
     ///
-    pub fn transition_until_halt(&mut self) {
+    pub fn transition_until_halt(&mut self) -> bool {
         // Triggers are reset after first transition.
         if !self.transition() {
-            return;
+            return false;
         };
         self.variables.reset_triggers();
 
         for _ in 0..self.nodes.len() {
             if !self.transition() {
-                return;
+                return true;
             };
         }
         panic!("recursive transition loop");

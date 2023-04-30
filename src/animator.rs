@@ -105,6 +105,9 @@ fn animate(
         }
 
         let animation_data = animator.state_graph.get_active().1;
+        if time.elapsed() < animation_data.animation.frame_duration + animator.last_frame_time.unwrap() {
+            continue;
+        }
         if !animation_data.has_exit_time {
             if let Some(next) = animator.play_next.take() {
                 animator.state_graph.set_active(next);
@@ -138,5 +141,7 @@ fn animate(
 
         let frame_iterator = animator.frame_iterator.as_mut().unwrap();
         frame_iterator.next();
+        animator.last_frame_time = Some(time.elapsed());
+        animator.state_graph.reset_triggers();
     }
 }

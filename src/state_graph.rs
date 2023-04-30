@@ -13,7 +13,7 @@ pub struct Transition {
 
 /// Represents a node in a StateGraph.  
 #[derive(Clone)]
-pub struct Node<T> {
+pub struct GraphNode<T> {
     /// The data that the node holds.
     pub data: T,
     /// A list of transitions that will be executed in priority of low to high.
@@ -23,7 +23,7 @@ pub struct Node<T> {
 /// A state graph that manages state transitions when conditions are met.
 pub struct StateGraph<T> {
     variables: VariableManager,
-    nodes: HashMap<String, Node<T>>,
+    nodes: HashMap<String, GraphNode<T>>,
     active: String,
 }
 
@@ -39,7 +39,7 @@ impl<T> StateGraph<T> {
     ///
     /// Panics if `nodes` does not contain the default node specified by `default_node_name`.
     ///
-    pub fn new(default_node_name: String, nodes: HashMap<String, Node<T>>) -> Self {
+    pub fn new(default_node_name: String, nodes: HashMap<String, GraphNode<T>>) -> Self {
         assert!(
             nodes.contains_key(&default_node_name),
             "default node not in node map"
@@ -97,7 +97,7 @@ impl<T> StateGraph<T> {
     /// * `name` - The unique name for the new node.
     /// * `data` - The data associated with the new node.
     ///
-    pub fn set_node(&mut self, name: String, node: Node<T>) {
+    pub fn set_node(&mut self, name: String, node: GraphNode<T>) {
         self.nodes.insert(name, node);
     }
 
@@ -120,6 +120,12 @@ impl<T> StateGraph<T> {
     ///
     pub fn set_trigger(&mut self, name: String) {
         self.variables.set_trigger(name);
+    }
+    
+    /// Resets all the triggers back to false.
+    ///
+    pub fn reset_triggers(&mut self) {
+        self.variables.reset_triggers();
     }
 
     /// Transitions through the states of the state graph until a halting state is reached.
@@ -177,58 +183,56 @@ mod tests {
 
     #[test]
     fn test_simple_transition() {
-        let mut nodes: HashMap<String, Node<String>> = HashMap::default();
-        let n1 = Node {
+        let mut nodes: HashMap<String, GraphNode<String>> = HashMap::default();
+        let n1 = GraphNode {
             data: "A1".to_string(),
             transitions: vec![Transition {
                 target: "N2".to_string(),
-                conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
+                conditions: vec![Condition::Eq("V1".to_string(), 0.0)],
             }],
         };
         nodes.insert("N1".to_string(), n1);
-        let n2 = Node {
+        let n2 = GraphNode {
             data: "A2".to_string(),
             transitions: vec![],
         };
         nodes.insert("N2".to_string(), n2);
         let mut state_graph = StateGraph::new("N1".to_string(), nodes);
-        state_graph.set_float("V1".to_string(), 0.0);
-        state_graph.set_float("V2".to_string(), 1.0);
+        state_graph.set_float("V1".to_string(), 1.0);
 
         state_graph.transition_until_halt();
         assert_eq!(state_graph.get_active().0.clone(), "N1".to_string());
-        state_graph.set_float("V2".to_string(), 0.0);
+        state_graph.set_float("V1".to_string(), 0.0);
         state_graph.transition_until_halt();
         assert_eq!(state_graph.get_active().0.clone(), "N2".to_string());
     }
 
     #[test]
     fn test_chained_transition() {
-        let mut nodes: HashMap<String, Node<String>> = HashMap::default();
-        let n1 = Node {
+        let mut nodes: HashMap<String, GraphNode<String>> = HashMap::default();
+        let n1 = GraphNode {
             data: "A1".to_string(),
             transitions: vec![Transition {
                 target: "N2".to_string(),
-                conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
+                conditions: vec![Condition::Eq("V1".to_string(), 0.0)],
             }],
         };
         nodes.insert("N1".to_string(), n1);
-        let n2 = Node {
+        let n2 = GraphNode {
             data: "A2".to_string(),
             transitions: vec![Transition {
                 target: "N3".to_string(),
-                conditions: vec![Condition::Eq("V1".to_string(), "V2".to_string())],
+                conditions: vec![Condition::Eq("V1".to_string(), 0.0)],
             }],
         };
         nodes.insert("N2".to_string(), n2);
-        let n3 = Node {
+        let n3 = GraphNode {
             data: "A3".to_string(),
             transitions: vec![],
         };
         nodes.insert("N3".to_string(), n3);
         let mut state_graph = StateGraph::new("N1".to_string(), nodes);
         state_graph.set_float("V1".to_string(), 0.0);
-        state_graph.set_float("V2".to_string(), 0.0);
 
         state_graph.transition_until_halt();
         assert_eq!(state_graph.get_active().0.clone(), "N3".to_string());
@@ -236,15 +240,15 @@ mod tests {
 
     #[test]
     fn test_trigger_transitions() {
-        let mut nodes: HashMap<String, Node<String>> = HashMap::default();
-        let n1 = Node {
+        let mut nodes: HashMap<String, GraphNode<String>> = HashMap::default();
+        let n1 = GraphNode {
             data: "A1".to_string(),
             transitions: vec![Transition {
                 target: "N2".to_string(),
                 conditions: vec![Condition::Trigger("T1".to_string())],
             }],
         };
-        let n2 = Node {
+        let n2 = GraphNode {
             data: "A2".to_string(),
             transitions: vec![],
         };

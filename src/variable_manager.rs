@@ -30,27 +30,36 @@ impl VariableManager {
 
 #[derive(Clone)]
 pub enum Condition {
-    Gt(String, String),
-    Lt(String, String),
-    Eq(String, String),
+    Gt(String, f32),
+    Lt(String, f32),
+    Eq(String, f32),
     Trigger(String),
 }
 
 impl Condition {
     fn eval(&self, variables: &VariableManager) -> bool {
         match self {
-            Condition::Gt(a, b) => match (variables.get_float(a), variables.get_float(b)) {
-                (Some(v1), Some(v2)) => v1 > v2,
-                _ => false,
-            },
-            Condition::Lt(a, b) => match (variables.get_float(a), variables.get_float(b)) {
-                (Some(v1), Some(v2)) => v1 < v2,
-                _ => false,
-            },
-            Condition::Eq(a, b) => match (variables.get_float(a), variables.get_float(b)) {
-                (Some(v1), Some(v2)) => v1 == v2,
-                _ => false,
-            },
+            Condition::Gt(a, b) => {
+                if let Some(a) = variables.get_float(a) {
+                    a > b
+                } else {
+                    false
+                }
+            }
+            Condition::Lt(a, b) => {
+                if let Some(a) = variables.get_float(a) {
+                    a < b
+                } else {
+                    false
+                }
+            }
+            Condition::Eq(a, b) => {
+                if let Some(a) = variables.get_float(a) {
+                    a == b
+                } else {
+                    false
+                }
+            }
             Condition::Trigger(a) => variables.get_trigger(a),
         }
     }

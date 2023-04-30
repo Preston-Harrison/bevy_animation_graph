@@ -46,23 +46,12 @@ impl Animator {
         }
     }
 
-    pub fn play_next(&mut self, name: String) {
+    pub fn transition_to(&mut self, name: String) {
         let (active_name, data) = self.state_graph.get_active();
         if *active_name == name {
             return;
         }
         self.play_next = Some(name);
-    }
-
-    fn play_new(&mut self, name: String, time: &Res<Time>) {
-        self.state_graph.set_active(name);
-        let (_, active_animation) = self.state_graph.get_active();
-        let (first_frame, last_frame) = (
-            active_animation.animation.first_frame,
-            active_animation.animation.last_frame,
-        );
-        self.frame_iterator = Some(FrameIterator::new(first_frame, last_frame));
-        self.last_frame_time = Some(time.elapsed());
     }
 
     fn sync_frame_iterator(&mut self) {
@@ -75,7 +64,7 @@ impl Animator {
     }
 }
 
-fn animate(
+pub fn animate(
     mut query: Query<
         (
             &mut Handle<TextureAtlas>,
